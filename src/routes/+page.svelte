@@ -30,7 +30,7 @@
 
   // Use reactive session from better-auth client (client-side only)
   if (browser) {
-    const session = authClient.useSession();
+    const session = authClient(`${window.location.origin}/api/auth`).useSession();
 
     // Sync client-side session with state
     $effect(() => {

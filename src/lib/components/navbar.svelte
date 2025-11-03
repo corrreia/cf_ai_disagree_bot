@@ -1,50 +1,62 @@
-<script lang="ts">
-  import { browser } from "$app/environment";
-  import { goto } from "$app/navigation";
-  import { authClient } from "$lib/auth-client";
-  import { Button } from "$lib/components/ui/button";
+<script lang="ts">import { Moon, Sun } from "lucide-svelte";
+import { toggleMode } from "mode-watcher";
+import { browser } from "$app/environment";
+import { goto } from "$app/navigation";
+import { authClient } from "$lib/auth-client";
+import { Button } from "$lib/components/ui/button";
 
-  let { user: serverUser } = $props();
+let { user: serverUser } = $props();
 
-  let user = $state(serverUser);
+let user = $state(serverUser);
 
-  // Use reactive session from better-auth client (client-side only)
-  if (browser) {
-    const session = authClient.useSession();
+// Create auth client instance (client-side only)
+const client = browser
+  ? authClient(`${window.location.origin}/api/auth`)
+  : null;
 
-    // Sync client-side session with state
-    $effect(() => {
-      const sessionData = session.get();
-      const clientUser = sessionData?.data?.user;
-      if (clientUser) {
-        user = clientUser;
-      } else {
-        const hasServerUser = !!serverUser;
-        if (!hasServerUser) {
-          user = undefined;
-        }
+// Use reactive session from better-auth client (client-side only)
+if (browser && client) {
+  const session = client.useSession();
+
+  // Sync client-side session with state
+  $effect(() => {
+    const sessionData = session.get();
+    const clientUser = sessionData?.data?.user;
+    if (clientUser) {
+      user = clientUser;
+    } else {
+      const hasServerUser = !!serverUser;
+      if (!hasServerUser) {
+        user = undefined;
       }
-    });
+    }
+  });
 
-    // Subscribe to session changes
-    $effect(() => {
-      const unsubscribe = session.subscribe((value) => {
-        user = value?.data?.user ?? serverUser;
-      });
-      return unsubscribe;
+  // Subscribe to session changes
+  $effect(() => {
+    const unsubscribe = session.subscribe((value) => {
+      user = value?.data?.user ?? serverUser;
     });
-  }
+    return unsubscribe;
+  });
+}
 
-  async function handleSignIn() {
-    await authClient.signIn.social({
-      provider: "google",
-    });
+async function handleSignIn() {
+  if (!client) {
+    return;
   }
+  await client.signIn.social({
+    provider: "google",
+  });
+}
 
-  async function handleSignOut() {
-    await authClient.signOut();
-    await goto("/");
+async function handleSignOut() {
+  if (!client) {
+    return;
   }
+  await client.signOut();
+  await goto("/");
+}
 </script>
 
 <nav
@@ -60,10 +72,15 @@
       </h1>
     </div>
     <div class="flex items-center gap-4">
+      <button variant="outline" size="icon" onclick={toggleMode}>
+        <Sun class="h-4 w-4 block dark:hidden"/>
+        <Moon class="h-4 w-4 hidden dark:block"/>
+        <span class="sr-only">Toggle theme</span>
+      </button>
       {#if user}
-      <Button variant="outline" onclick={handleSignOut}>Sign Out</Button>
+      <button variant="outline" onclick={handleSignOut}>Sign Out</button>
       {:else}
-      <Button onclick={handleSignIn}>
+      <button onclick={handleSignIn}>
         <svg
           class="mr-2 size-4"
           xmlns="http://www.w3.org/2000/svg"
@@ -88,7 +105,7 @@
           />
         </svg>
         Sign in with Google
-      </Button>
+      </button>
       {/if}
     </div>
   </div>

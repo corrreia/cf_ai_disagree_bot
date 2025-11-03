@@ -34,10 +34,16 @@ use the new svelte 5 runes syntax for everything
 ## Prompt 3
 
 ```txt
-once the user is logged in "Dissagree Bot" should turn in to "I will dissagree with [user name]" and the sign in button should turn in to a sign out
+once the user is logged in "Disagree Bot" should turn in to "I will disagree with [user name]" and the sign in button should turn in to a sign out
 ```
 
-## Prompt 3
+## Prompt 4
+
+Migrated from the "cloudflare:workers" syntax to getting the env and all bindings dynamically from the request with "const event = getRequestEvent();", now `vite dev` works! I do not have the exact prompt but it was a combination of help from ChatGPT and pasting in to the cursor chat.
+
+https://chatgpt.com/c/6908041d-27fc-832a-88c4-ca41d245f1b2
+
+## Prompt 5
 
 ```txt
 add a dark mode switch button on top of the page www.shadcn-svelte.com/docs/dark-mode/svelte
