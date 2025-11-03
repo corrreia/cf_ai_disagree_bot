@@ -72,15 +72,15 @@ async function handleSignOut() {
       </h1>
     </div>
     <div class="flex items-center gap-4">
-      <button variant="outline" size="icon" onclick={toggleMode}>
+      <Button variant="outline" size="icon" onclick={toggleMode}>
         <Sun class="h-4 w-4 block dark:hidden"/>
         <Moon class="h-4 w-4 hidden dark:block"/>
         <span class="sr-only">Toggle theme</span>
-      </button>
+      </Button>
       {#if user}
-      <button variant="outline" onclick={handleSignOut}>Sign Out</button>
+      <Button variant="outline" onclick={handleSignOut}>Sign Out</Button>
       {:else}
-      <button onclick={handleSignIn}>
+      <Button onclick={handleSignIn}>
         <svg
           class="mr-2 size-4"
           xmlns="http://www.w3.org/2000/svg"
@@ -105,7 +105,7 @@ async function handleSignOut() {
           />
         </svg>
         Sign in with Google
-      </button>
+      </Button>
       {/if}
     </div>
   </div>

@@ -12,7 +12,6 @@
     CardTitle,
   } from "$lib/components/ui/card";
   import { Input } from "$lib/components/ui/input";
-  import { Separator } from "$lib/components/ui/separator";
   import type { PageData } from "./$types";
 
   type Message = {
@@ -115,10 +114,10 @@
 
   {#if !user}
   <div class="flex flex-1 items-center justify-center p-8">
-    <Card class="max-w-md">
-      <CardHeader class="text-center">
-        <CardTitle class="text-2xl">Welcome to Disagree Bot</CardTitle>
-        <CardDescription>
+    <Card class="w-full max-w-md shadow-lg">
+      <CardHeader class="text-center space-y-2 px-6 pt-6 pb-4">
+        <CardTitle class="text-3xl font-semibold">Welcome to Disagree Bot</CardTitle>
+        <CardDescription class="text-base">
           Please sign in with Google to start chatting
         </CardDescription>
       </CardHeader>
@@ -129,44 +128,48 @@
     <!-- Messages Area -->
     <div
       bind:this={messagesContainer}
-      class="flex-1 overflow-y-auto p-4 space-y-4"
+      class="flex-1 overflow-y-auto px-4 py-6 md:px-6 lg:px-8"
     >
-      {#if messages.length === 0}
-      <div class="flex h-full items-center justify-center">
-        <Card class="max-w-md">
-          <CardHeader class="text-center">
-            <CardTitle>Start a conversation</CardTitle>
-            <CardDescription>
-              Type a message below to begin chatting
-            </CardDescription>
-          </CardHeader>
-        </Card>
+      <div class="container mx-auto max-w-4xl space-y-4">
+        {#if messages.length === 0}
+        <div class="flex h-full min-h-[400px] items-center justify-center py-12">
+          <Card class="w-full max-w-md shadow-md">
+            <CardHeader class="text-center space-y-2 px-6 pt-6 pb-4">
+              <CardTitle class="text-2xl font-semibold">Start a conversation</CardTitle>
+              <CardDescription class="text-base">
+                Type a message below to begin chatting
+              </CardDescription>
+            </CardHeader>
+          </Card>
+        </div>
+        {:else}
+        {#each messages as message (message.id)}
+        <div
+          class="flex gap-4 {message.role === 'user'
+              ? 'justify-end'
+              : 'justify-start'}"
+        >
+          <Card
+            class="max-w-[85%] md:max-w-[75%] shadow-sm {message.role === 'user'
+                ? 'bg-primary/5 dark:bg-primary/10'
+                : ''}"
+          >
+            <CardContent class="p-4 md:p-5">
+              <p class="text-sm md:text-base leading-relaxed whitespace-pre-wrap">{message.content}</p>
+              <p class="mt-3 text-xs text-muted-foreground">
+                {new Date(message.timestamp).toLocaleTimeString()}
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+        {/each}
+        {/if}
       </div>
-      {:else}
-      {#each messages as message (message.id)}
-      <div
-        class="flex gap-3 {message.role === 'user'
-            ? 'justify-end'
-            : 'justify-start'}"
-      >
-        <Card class="max-w-[80%]">
-          <CardContent class="p-4">
-            <p class="text-sm whitespace-pre-wrap">{message.content}</p>
-            <p class="mt-2 text-xs text-muted-foreground">
-              {new Date(message.timestamp).toLocaleTimeString()}
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-      {/each}
-      {/if}
     </div>
 
-    <Separator/>
-
     <!-- Input Area -->
-    <div class="p-4">
-      <div class="container mx-auto flex gap-2">
+    <div class="border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-4 py-4 md:px-6 lg:px-8">
+      <div class="container mx-auto max-w-4xl flex gap-3">
         <Input
           bind:value={inputValue}
           onkeydown={handleKeyPress}

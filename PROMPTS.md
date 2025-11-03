@@ -49,6 +49,15 @@ https://chatgpt.com/c/6908041d-27fc-832a-88c4-ca41d245f1b2
 add a dark mode switch button on top of the page www.shadcn-svelte.com/docs/dark-mode/svelte
 ```
 
-## Manual changes 1
+## Prompt 6
 
-Added a 
+```txt
+@+page.svelte (116-163) 
+
+make this center section prettier, right spacing etc
+```
+
+Just some visual things.
+
+## Prompt 7
+
