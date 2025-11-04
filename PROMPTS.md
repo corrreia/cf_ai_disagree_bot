@@ -133,7 +133,7 @@ if (!session?.user?.id) {
 
 ## Prompt 10
 
-````txt
+```txt
 Before going any deeper in the agent implementation, lets convert the `server.addEventListener()` to the new Native Durable Object WebSocket API so we can take advantage of hibernate without disconnecting.
 
 use the cloudflare mcp server
@@ -171,3 +171,7 @@ i have also added the system prompt to the wrangler, add it to the agent
 ```txt
 do not let the user send another message before the last one is fully received
 ```
+
+## Manual changes
+
+Found out we can actually have rpc calls between 2 workers in the dev env (honestly, it would not make any sense if we did't), added the script "dev:workers" to package.jons
