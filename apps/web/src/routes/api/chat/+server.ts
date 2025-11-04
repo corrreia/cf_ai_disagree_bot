@@ -1,5 +1,6 @@
 import { json } from "@sveltejs/kit";
 import { getRequestEvent } from "$app/server";
+import { auth } from "$lib/server/auth";
 import type { RequestHandler } from "./$types";
 
 export const POST: RequestHandler = async ({ request }) => {
@@ -12,17 +13,23 @@ export const POST: RequestHandler = async ({ request }) => {
       );
     }
 
-    const { message, userId } = (await request.json()) as {
+    // Get authenticated user from session
+    const session = await auth.api.getSession({
+      headers: request.headers,
+    });
+
+    if (!session?.user?.id) {
+      return json({ error: "Authentication required" }, { status: 401 });
+    }
+
+    const userId = session.user.id;
+
+    const { message } = (await request.json()) as {
       message?: string;
-      userId?: string;
     };
 
     if (!message || typeof message !== "string") {
       return json({ error: "Message is required" }, { status: 400 });
-    }
-
-    if (!userId || typeof userId !== "string") {
-      return json({ error: "User ID is required" }, { status: 400 });
     }
 
     // Get the ChatAgent namespace from the environment

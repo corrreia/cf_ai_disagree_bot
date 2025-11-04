@@ -1,18 +1,26 @@
+import type { RequestEvent } from "@sveltejs/kit";
 import { getRequestEvent } from "$app/server";
-import type { RequestHandler } from "./$types";
+import { auth } from "$lib/server/auth";
 
-export const GET: RequestHandler = async ({ request, url }) => {
+export const GET = async ({ request }: RequestEvent) => {
   try {
     const event = getRequestEvent();
     if (!event?.platform?.env) {
-      return new Response("Platform environment not available", { status: 500 });
+      return new Response("Platform environment not available", {
+        status: 500,
+      });
     }
 
-    // Get userId from query params
-    const userId = url.searchParams.get("userId");
-    if (!userId) {
-      return new Response("User ID is required", { status: 400 });
+    // Get authenticated user from session
+    const session = await auth.api.getSession({
+      headers: request.headers,
+    });
+
+    if (!session?.user?.id) {
+      return new Response("Authentication required", { status: 401 });
     }
+
+    const userId = session.user.id;
 
     // Check if this is a WebSocket upgrade request
     if (request.headers.get("Upgrade") !== "websocket") {
@@ -41,4 +49,3 @@ export const GET: RequestHandler = async ({ request, url }) => {
     );
   }
 };
-

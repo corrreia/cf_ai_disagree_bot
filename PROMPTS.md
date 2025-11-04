@@ -102,8 +102,41 @@ THis implemented the agent with successful communication between agent (DO) <-> 
 ```txt
 lets implement the ai agent now! 
 
-we need to bind ai to the durable object (i think) check cloudflare examples and docs
+we need to bind ai to the durable object check cloudflare examples and docs
 
-llama-3.3-70b-instruct-fp8-fast lets use this models
-websockets suport!
+llama-3.3-70b-instruct-fp8-fast lets use this model
+websockets support!
 ```
+
+This implemented a s websocket in the Durable Object. The way it works wight now is the user connects to `/api/chat/ws?userId={userId}` the worker checks the user ID and upgrades the connection to a websocket pointing it straight to the specific DO instance. There is very clearly a problem in here, any user can spoof the user ID to access any other users's instance.
+
+## Prompt 9
+
+```txt
+the fact the we are blindingly trusting the user id in /api/chat/ws?userId={userId} makes so it is possible to spoof it.
+
+instead of the userid being sent in the param, just use the authenticated user id
+```
+
+This way we get the authenticated user from the session.
+
+```typescript
+// Get authenticated user from session
+const session = await auth.api.getSession({
+  headers: request.headers,
+});
+
+if (!session?.user?.id) {
+  return new Response("Authentication required", { status: 401 });
+}
+```
+
+## Prompt 10
+
+````txt
+Before going any deeper in the agent implementation, lets convert the `server.addEventListener()` to the new Native Durable Object WebSocket API so we can take advantage of hibernate without disconnecting.
+
+use the cloudflare mcp server
+```
+
+After some console.log debug > paste in to IDE chat, chat with streaming  is working!!
