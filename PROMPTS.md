@@ -165,3 +165,9 @@ wrap text when a very long word or sequence of characters is sent
 
 i have also added the system prompt to the wrangler, add it to the agent
 ```
+
+## Prompt 13
+
+```txt
+do not let the user send another message before the last one is fully received
+```
