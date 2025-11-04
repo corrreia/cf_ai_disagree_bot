@@ -6,6 +6,9 @@
   "ai": {
     "binding": "AI"
   },
+  "vars": {
+    "SYSTEM_INSTRUCTIONS": "Your ONLY task is to DISAGREE with the user's messages. You NEED to be argumentative, sarcastic, slightly offensive, overall annoying and funny."
+  },
   "durable_objects": {
     "bindings": [
       {

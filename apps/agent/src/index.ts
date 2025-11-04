@@ -288,10 +288,23 @@ export class ChatAgent extends Agent<Env, AgentState> {
     (this.state as AgentState).memory = updatedMemory;
 
     // Prepare messages for AI (convert to chat format)
-    const chatMessages = updatedMemory.map((msg) => ({
-      role: msg.role,
-      content: msg.content,
-    }));
+    // Get system instructions from environment variable
+    const systemInstructions =
+      (this.env.SYSTEM_INSTRUCTIONS as string | undefined) || "";
+    const chatMessages = [
+      ...(systemInstructions
+        ? [
+            {
+              role: "system" as const,
+              content: systemInstructions,
+            },
+          ]
+        : []),
+      ...updatedMemory.map((msg) => ({
+        role: msg.role,
+        content: msg.content,
+      })),
+    ];
 
     try {
       const assistantMessageId = crypto.randomUUID();
@@ -377,10 +390,23 @@ export class ChatAgent extends Agent<Env, AgentState> {
     (this.state as AgentState).memory = updatedMemory;
 
     // Prepare messages for AI (convert to chat format)
-    const chatMessages = updatedMemory.map((msg) => ({
-      role: msg.role,
-      content: msg.content,
-    }));
+    // Get system instructions from environment variable
+    const systemInstructions =
+      (this.env.SYSTEM_INSTRUCTIONS as string | undefined) || "";
+    const chatMessages = [
+      ...(systemInstructions
+        ? [
+            {
+              role: "system" as const,
+              content: systemInstructions,
+            },
+          ]
+        : []),
+      ...updatedMemory.map((msg) => ({
+        role: msg.role,
+        content: msg.content,
+      })),
+    ];
 
     // Call Cloudflare Workers AI
     try {

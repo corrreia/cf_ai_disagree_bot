@@ -162,4 +162,6 @@ only show the date (and time) upon clicking or hovering a message
 show to the right on assistant messages and to the left on user messages, outside the card
 
 wrap text when a very long word or sequence of characters is sent
+
+i have also added the system prompt to the wrangler, add it to the agent
 ```
