@@ -181,7 +181,7 @@
               : 'justify-start'}"
         >
           <Card
-            class="max-w-[85%] md:max-w-[75%] shadow-sm {message.role === 'user'
+            class="max-w-[85%] md:max-w-[75%] shadow-sm py-0 {message.role === 'user'
                 ? 'bg-primary/5 dark:bg-primary/10'
                 : ''}"
           >

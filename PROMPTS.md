@@ -84,15 +84,15 @@ It was clear I needed to set up a monorepo, multi project setup following this [
 
 So i configured turborepo with a `/apps/web` where the sveltekit app is located, and `apps/agent` where the agent DO is at. Also lined them together in the wrangler configs.
 
+## Prompt 7
 
-----
-
-
+```txt
 implement a cloudflare agent
-
-currently do a simple thing, just repply with the user's message and keep a state (memory array)>
-
-to communicate between do and woerker use the inetrnalk connection, not http
-
+currently do a simple thing, just reply with the user's message and keep a state (memory array)>
+to communicate between do and worker use the internal rpc connection, not http
+one agent for every user
 
 use mcp servers to search cloudflare docs
+```
+
+THis implemented the agent with successful communication between agent (DO) <-> worker. This only works in the `wrangler dev` environment and is a pain to develop in :)
