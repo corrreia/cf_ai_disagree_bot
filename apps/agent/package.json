@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "wrangler dev",
-    "deploy": "wrangler deploy"
+    "deploy": "wrangler deploy",
+    "cf-typegen": "wrangler types ./src/worker-configuration.d.ts"
   },
   "dependencies": {
     "agents": "^0.2.20"

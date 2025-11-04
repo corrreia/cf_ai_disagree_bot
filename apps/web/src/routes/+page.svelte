@@ -21,7 +21,6 @@
     timestamp: Date;
   };
 
-  const RESPONSE_DELAY_MS = 1000;
 
   let { data = { user: undefined } }: { data?: PageData } = $props();
 
@@ -57,6 +56,7 @@
   let messages = $state<Message[]>([]);
   let inputValue = $state("");
   let messagesContainer = $state<HTMLDivElement | undefined>(undefined);
+  let isLoading = $state(false);
 
   function scrollToBottom() {
     setTimeout(() => {
@@ -67,7 +67,7 @@
     }, 0);
   }
 
-  function sendMessage() {
+  async function sendMessage() {
     const trimmedInput = inputValue.trim();
     if (!trimmedInput) {
       return;
@@ -85,20 +85,51 @@
 
     messages = [...messages, userMessage];
     inputValue = "";
+    isLoading = true;
     scrollToBottom();
 
-    // TODO: Replace with actual API call to chatbot
-    // For now, simulate a response
-    setTimeout(() => {
+    try {
+      const response = await fetch("/api/chat", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          message: trimmedInput,
+          userId: user.id,
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error((error as { error?: string }).error || "Failed to send message");
+      }
+
+      const responseData = await response.json();
+
       const assistantMessage: Message = {
         id: crypto.randomUUID(),
-        content: "I understand your message. This is a placeholder response.",
+        content: (responseData as { response: string }).response,
         role: "assistant",
         timestamp: new Date(),
       };
+
       messages = [...messages, assistantMessage];
       scrollToBottom();
-    }, RESPONSE_DELAY_MS);
+    } catch (error) {
+      // biome-ignore lint: console.error is used for debugging
+      console.error("Error sending message:", error);
+      const errorMessage: Message = {
+        id: crypto.randomUUID(),
+        content: error instanceof Error ? error.message : "Failed to send message. Please try again.",
+        role: "assistant",
+        timestamp: new Date(),
+      };
+      messages = [...messages, errorMessage];
+      scrollToBottom();
+    } finally {
+      isLoading = false;
+    }
   }
 
   function handleKeyPress(event: KeyboardEvent) {
@@ -179,7 +210,7 @@
         />
         <Button
           onclick={sendMessage}
-          disabled={!user || !inputValue.trim()}
+          disabled={!user || !inputValue.trim() || isLoading}
           size="icon"
         >
           <Send class="size-4"/>
