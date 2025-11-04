@@ -1,10 +1,11 @@
-<script lang="ts">
-import ChatInput from "@/components/chat-input.svelte";
+<script lang="ts">import ChatInput from "@/components/chat-input.svelte";
 import MessageList from "@/components/message-list.svelte";
 import WelcomeCard from "@/components/welcome-card.svelte";
 import { browser } from "$app/environment";
+import { AudioHandler } from "$lib/audio-handler";
 import { authClient } from "$lib/auth-client";
 import Navbar from "$lib/components/navbar.svelte";
+import { RealtimeClient } from "$lib/realtime-client";
 import {
   handleWebSocketMessage,
   type Message,
@@ -16,6 +17,10 @@ import type { PageData } from "./$types";
 let { data = { user: undefined } }: { data?: PageData } = $props();
 
 let user = $state(data?.user);
+let voiceEnabled = $state(false);
+let isRecording = $state(false);
+let audioHandler: AudioHandler | null = null;
+let realtimeClient: RealtimeClient | null = null;
 
 // Use reactive session from better-auth client (client-side only)
 if (browser) {
@@ -51,6 +56,12 @@ let isLoading = $state(false);
 let ws = $state<WebSocket | null>(null);
 let isConnected = $state(false);
 let isLoadingMessages = $state(false);
+
+// Initialize audio handler and realtime client when voice is enabled
+if (browser) {
+  audioHandler = new AudioHandler();
+  realtimeClient = new RealtimeClient();
+}
 
 function scrollToBottom() {
   setTimeout(() => {
@@ -128,6 +139,116 @@ async function clearChat() {
     console.error("Error clearing chat:", err);
   }
 }
+
+// Toggle voice mode
+async function toggleVoice() {
+  if (!(browser && user)) {
+    return;
+  }
+  if (!(audioHandler && realtimeClient)) {
+    return;
+  }
+
+  if (voiceEnabled) {
+    // Disable voice mode
+    await disableVoice();
+  } else {
+    // Enable voice mode
+    await enableVoice();
+  }
+}
+
+// Enable voice mode
+async function enableVoice() {
+  if (!(audioHandler && realtimeClient)) {
+    return;
+  }
+
+  try {
+    // Initialize audio
+    await audioHandler.initialize();
+
+    // Create WebSocket endpoints for adapters
+    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+    const ingestEndpoint = `${protocol}//${window.location.host}/api/realtime/audio/ingest`;
+    const streamEndpoint = `${protocol}//${window.location.host}/api/realtime/audio/stream`;
+
+    // Create adapters
+    const adapters = await realtimeClient.createAdapters(
+      ingestEndpoint,
+      streamEndpoint
+    );
+
+    // Connect to ingest WebSocket (client -> agent)
+    realtimeClient.connectIngest(adapters.ingest.endpoint, () => {
+      // Audio chunks are sent automatically via startStreaming
+    });
+
+    // Connect to stream WebSocket (agent -> client)
+    realtimeClient.connectStream(adapters.stream.endpoint, async (chunk) => {
+      // Play received audio
+      if (audioHandler) {
+        try {
+          await audioHandler.playPCMAudio(chunk);
+        } catch (error) {
+          // biome-ignore lint: console.error is used for debugging
+          console.error("Error playing audio:", error);
+        }
+      }
+    });
+
+    // Start streaming audio
+    audioHandler.startStreaming((chunk) => {
+      // Send audio chunk to ingest WebSocket
+      if (realtimeClient) {
+        realtimeClient.sendAudioChunk(chunk);
+      }
+    });
+
+    voiceEnabled = true;
+    isRecording = true;
+  } catch (error) {
+    // biome-ignore lint: console.error is used for debugging
+    console.error("Error enabling voice:", error);
+    // biome-ignore lint: no-alert
+    alert("Failed to enable voice mode. Please check microphone permissions.");
+  }
+}
+
+// Disable voice mode
+async function disableVoice() {
+  if (!(audioHandler && realtimeClient)) {
+    return;
+  }
+
+  try {
+    // Stop streaming
+    audioHandler.stopStreaming();
+
+    // Cleanup
+    await realtimeClient.cleanup();
+    audioHandler.cleanup();
+
+    voiceEnabled = false;
+    isRecording = false;
+  } catch (error) {
+    // biome-ignore lint: console.error is used for debugging
+    console.error("Error disabling voice:", error);
+  }
+}
+
+// Cleanup when component unmounts or user logs out
+$effect(() => {
+  if (!user && voiceEnabled) {
+    disableVoice();
+  }
+
+  return () => {
+    if (voiceEnabled) {
+      disableVoice();
+    }
+  };
+});
 
 // Connect WebSocket when user is available
 $effect(() => {
@@ -260,14 +381,36 @@ function sendMessage() {
 </script>
 
 <div class="flex h-screen flex-col">
-  <Navbar user={user} onClearChat={clearChat}/>
+  <Navbar
+    user={user}
+    onClearChat={clearChat}
+    voiceEnabled={voiceEnabled}
+    onVoiceToggle={toggleVoice}
+  />
 
   {#if !user}
   <WelcomeCard/>
   {:else}
   <div class="flex flex-1 flex-col overflow-hidden">
+    {#if voiceEnabled && isRecording}
+    <div class="px-4 py-2 bg-primary/10 text-center text-sm">
+      <span class="animate-pulse">●</span>Recording...
+    </div>
+    {/if}
     <MessageList {messages} bind:messagesContainer/>
+    {#if !voiceEnabled}
     <ChatInput bind:inputValue {isLoading} {isConnected} onSend={sendMessage}/>
+    {:else}
+    <div
+      class="border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-2 py-3 sm:px-4 sm:py-4 md:px-6 lg:px-8"
+    >
+      <div class="container mx-auto max-w-4xl flex justify-center">
+        <p class="text-sm text-muted-foreground">
+          Voice mode active. Speak into your microphone.
+        </p>
+      </div>
+    </div>
+    {/if}
   </div>
   {/if}
 </div>

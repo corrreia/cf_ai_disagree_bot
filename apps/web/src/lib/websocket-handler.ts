@@ -11,6 +11,10 @@ export type WebSocketMessageData = {
   messageId?: string;
   chunk?: string;
   error?: string;
+  // Audio-related message types
+  audioChunk?: ArrayBuffer | Uint8Array;
+  audioStart?: boolean;
+  audioEnd?: boolean;
 };
 
 const RECONNECT_DELAY_MS = 3000;
@@ -77,6 +81,15 @@ export function handleWebSocketMessage(options: {
     };
     updatedMessages.push(errorMessage);
     scrollToBottom();
+  } else if (wsData.type === "audio_start") {
+    // Audio streaming started - handled by audio handler
+    // No UI update needed here
+  } else if (wsData.type === "audio_chunk") {
+    // Audio chunk received - handled by audio handler
+    // No UI update needed here
+  } else if (wsData.type === "audio_end") {
+    // Audio streaming ended - handled by audio handler
+    // No UI update needed here
   }
 
   return updatedMessages;

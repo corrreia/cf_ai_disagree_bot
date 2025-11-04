@@ -1,5 +1,6 @@
 /// <reference path="./worker-configuration.d.ts" />
 import { Agent } from "agents";
+import { RealtimeAdapterHandler } from "./realtime-handler";
 
 const SSE_DATA_PREFIX_LENGTH = 6; // Length of "data: "
 
@@ -23,6 +24,12 @@ export class ChatAgent extends Agent<Env, AgentState> {
     memory: [],
   };
 
+  private realtimeHandler: RealtimeAdapterHandler | null = null;
+  private readonly audioWsConnections: Map<
+    WebSocket,
+    { type: "ingest" | "stream" }
+  > = new Map();
+
   async onStart() {
     // Agent started - memory is available via this.state.memory
     // Load state from storage if it exists (for hibernation compatibility)
@@ -30,6 +37,9 @@ export class ChatAgent extends Agent<Env, AgentState> {
     if (storedState) {
       (this.state as AgentState).memory = storedState.memory || [];
     }
+
+    // Initialize Realtime handler
+    this.realtimeHandler = new RealtimeAdapterHandler(this.env);
   }
 
   // Handle WebSocket connections using Native Durable Object WebSocket API for hibernation
@@ -62,6 +72,14 @@ export class ChatAgent extends Agent<Env, AgentState> {
     message: string | ArrayBuffer
   ): Promise<void> {
     try {
+      // Check if this is an audio WebSocket connection
+      const audioConn = this.audioWsConnections.get(ws);
+      if (audioConn) {
+        await this.handleAudioWebSocketMessage(ws, message, audioConn.type);
+        return;
+      }
+
+      // Handle text messages
       const messageStr =
         typeof message === "string"
           ? message
@@ -70,10 +88,14 @@ export class ChatAgent extends Agent<Env, AgentState> {
         type: string;
         message?: string;
         messageId?: string;
+        adapterType?: "ingest" | "stream";
       };
 
       if (data.type === "message" && data.message) {
         await this.handleWebSocketMessage(ws, data.message, data.messageId);
+      } else if (data.type === "audio_connection" && data.adapterType) {
+        // Register audio WebSocket connection
+        this.audioWsConnections.set(ws, { type: data.adapterType });
       }
     } catch (error) {
       // biome-ignore lint: console.error is used for debugging
@@ -87,14 +109,178 @@ export class ChatAgent extends Agent<Env, AgentState> {
     }
   }
 
-  // Handle WebSocket close using the hibernation API
-  async webSocketClose(
+  // Handle audio WebSocket messages (PCM audio chunks)
+  private handleAudioWebSocketMessage(
     _ws: WebSocket,
+    message: string | ArrayBuffer,
+    type: "ingest" | "stream"
+  ): void {
+    if (!this.realtimeHandler) {
+      return;
+    }
+
+    if (type === "ingest") {
+      // Receive audio from client, accumulate and transcribe
+      let audioData: Uint8Array;
+      if (message instanceof ArrayBuffer) {
+        audioData = new Uint8Array(message);
+      } else {
+        // Convert string to Uint8Array (assuming it's already binary data)
+        const str =
+          typeof message === "string"
+            ? message
+            : new TextDecoder().decode(message);
+        audioData = new Uint8Array(str.length);
+        let i = 0;
+        while (i < str.length) {
+          audioData[i] = str.charCodeAt(i);
+          i += 1;
+        }
+      }
+
+      this.realtimeHandler.addAudioChunk(audioData);
+
+      // Periodically transcribe (you might want to adjust this logic)
+      // For now, we'll transcribe when explicitly requested via a control message
+    } else if (type === "stream") {
+      // This shouldn't happen - stream adapter sends TO the client
+      // biome-ignore lint: console.error is used for debugging
+      console.warn("Received message on stream WebSocket");
+    }
+  }
+
+  // Handle WebSocket close using the hibernation API
+  webSocketClose(
+    ws: WebSocket,
     _code: number,
     _reason: string,
     _wasClean: boolean
   ): Promise<void> {
-    // WebSocket closed - no action needed
+    // Clean up audio WebSocket connection
+    this.audioWsConnections.delete(ws);
+    return Promise.resolve();
+  }
+
+  // Create Realtime SFU adapters for voice communication
+  async createRealtimeAdapters(
+    ingestEndpoint: string,
+    streamEndpoint: string
+  ): Promise<{ ingest: unknown; stream: unknown }> {
+    if (!this.realtimeHandler) {
+      throw new Error("Realtime handler not initialized");
+    }
+
+    const ingestTrackName = `audio-ingest-${crypto.randomUUID()}`;
+    const streamTrackName = `audio-stream-${crypto.randomUUID()}`;
+
+    // Create ingest adapter
+    const ingestAdapter = await this.realtimeHandler.createIngestAdapter(
+      ingestEndpoint,
+      ingestTrackName
+    );
+
+    // Create stream adapter using the same session ID
+    const streamAdapter = await this.realtimeHandler.createStreamAdapter(
+      ingestAdapter.sessionId,
+      streamTrackName,
+      streamEndpoint
+    );
+
+    return {
+      ingest: ingestAdapter,
+      stream: streamAdapter,
+    };
+  }
+
+  // Process transcribed text and generate audio response
+  async processVoiceMessage(
+    transcribedText: string,
+    streamWs: WebSocket
+  ): Promise<void> {
+    if (!this.realtimeHandler) {
+      throw new Error("Realtime handler not initialized");
+    }
+
+    // Process text message (add to memory and get AI response)
+    const userMsg: Message = {
+      id: crypto.randomUUID(),
+      content: transcribedText,
+      role: "user",
+      timestamp: Date.now(),
+    };
+
+    const updatedMemory = [...this.state.memory, userMsg];
+    await this.ctx.storage.put("state", { memory: updatedMemory });
+    (this.state as AgentState).memory = updatedMemory;
+
+    // Get system instructions
+    const systemInstructions =
+      (this.env.SYSTEM_INSTRUCTIONS as string | undefined) || "";
+    const chatMessages = [
+      ...(systemInstructions
+        ? [
+            {
+              role: "system" as const,
+              content: systemInstructions,
+            },
+          ]
+        : []),
+      ...updatedMemory.map((msg) => ({
+        role: msg.role,
+        content: msg.content,
+      })),
+    ];
+
+    try {
+      // Call AI to generate response
+      const aiResponse = (await this.env.AI.run(
+        "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+        {
+          messages: chatMessages,
+        }
+      )) as { response: string };
+
+      const assistantMessage: Message = {
+        id: crypto.randomUUID(),
+        content: aiResponse.response,
+        role: "assistant",
+        timestamp: Date.now(),
+      };
+
+      const finalMemory = [...updatedMemory, assistantMessage];
+      await this.ctx.storage.put("state", { memory: finalMemory });
+      (this.state as AgentState).memory = finalMemory;
+
+      // Synthesize response to audio and stream
+      await this.realtimeHandler.synthesizeAndStream(
+        aiResponse.response,
+        streamWs
+      );
+    } catch (error) {
+      // biome-ignore lint: console.error is used for debugging
+      console.error("Error processing voice message:", error);
+      throw error;
+    }
+  }
+
+  // Transcribe accumulated audio and process
+  async transcribeAndRespond(streamWs: WebSocket): Promise<void> {
+    if (!this.realtimeHandler) {
+      throw new Error("Realtime handler not initialized");
+    }
+
+    const transcribedText = await this.realtimeHandler.transcribe();
+    if (transcribedText.trim()) {
+      await this.processVoiceMessage(transcribedText, streamWs);
+    }
+  }
+
+  // Cleanup Realtime adapters
+  async cleanupRealtime(): Promise<void> {
+    if (this.realtimeHandler) {
+      await this.realtimeHandler.cleanup();
+    }
+    this.audioWsConnections.clear();
   }
 
   // Extract text from OpenAI format (choices[0].delta.content)

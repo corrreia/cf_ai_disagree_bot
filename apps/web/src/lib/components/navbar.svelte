@@ -1,5 +1,5 @@
 <script lang="ts">
-import { Moon, Sun, Trash2 } from "lucide-svelte";
+import { Moon, Sun, Trash2, Mic, MicOff } from "lucide-svelte";
 import { toggleMode } from "mode-watcher";
 import { browser } from "$app/environment";
 import { goto } from "$app/navigation";
@@ -9,9 +9,13 @@ import { Button } from "$lib/components/ui/button";
 let {
   user: serverUser,
   onClearChat,
+  voiceEnabled = $bindable(false),
+  onVoiceToggle,
 }: {
   user: unknown;
   onClearChat?: () => void;
+  voiceEnabled?: boolean;
+  onVoiceToggle?: () => void;
 } = $props();
 
 let user = $state(serverUser);
@@ -88,6 +92,21 @@ async function handleSignOut() {
       >
         <Trash2 class="h-4 w-4"/>
         <span class="sr-only">Clear chat</span>
+      </Button>
+      {/if}
+      {#if user && onVoiceToggle}
+      <Button
+        variant={voiceEnabled ? "default" : "outline"}
+        size="icon"
+        onclick={onVoiceToggle}
+        title={voiceEnabled ? "Disable voice" : "Enable voice"}
+      >
+        {#if voiceEnabled}
+        <Mic class="h-4 w-4"/>
+        {:else}
+        <MicOff class="h-4 w-4"/>
+        {/if}
+        <span class="sr-only">{voiceEnabled ? "Disable voice" : "Enable voice"}</span>
       </Button>
       {/if}
       <Button variant="outline" size="icon" onclick={toggleMode}>

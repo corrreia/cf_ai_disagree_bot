@@ -171,3 +171,21 @@ i have also added the system prompt to the wrangler, add it to the agent
 ```txt
 do not let the user send another message before the last one is fully received
 ```
+
+## Prompt 14
+
+```txt
+lets implement a text to speech model and speech to text using cloudflare workers ai and realtime kit.
+
+https://developers.cloudflare.com/realtime/agents/getting-started/ 
+
+text to speech = @cf/myshell-ai/melotts
+speech to text = @cf/openai/whisper
+
+there should be a toggle on the navbar to have or not voice (assistant)
+```
+
+I used the plan mode in Cursor for this, and what followed was absolutely out of this world.
+
+Cursor implemented 600+ new lines of code!!
+

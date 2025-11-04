@@ -9,7 +9,8 @@
     "cf-typegen": "wrangler types ./src/worker-configuration.d.ts"
   },
   "dependencies": {
-    "agents": "^0.2.20"
+    "agents": "^0.2.20",
+    "protobufjs": "^7.5.4"
   },
   "devDependencies": {
     "wrangler": "^4.45.3"
