@@ -1,11 +1,18 @@
-<script lang="ts">import { Moon, Sun } from "lucide-svelte";
+<script lang="ts">
+import { Moon, Sun, Trash2 } from "lucide-svelte";
 import { toggleMode } from "mode-watcher";
 import { browser } from "$app/environment";
 import { goto } from "$app/navigation";
 import { authClient } from "$lib/auth-client";
 import { Button } from "$lib/components/ui/button";
 
-let { user: serverUser } = $props();
+let {
+  user: serverUser,
+  onClearChat,
+}: {
+  user: unknown;
+  onClearChat?: () => void;
+} = $props();
 
 let user = $state(serverUser);
 
@@ -60,18 +67,29 @@ async function handleSignOut() {
 </script>
 
 <nav
-  class="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60"
+  class="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50"
 >
-  <div class="container mx-auto flex h-16 items-center justify-between px-4">
-    <div class="flex items-center gap-2">
-      <h1 class="text-xl font-semibold">
+  <div class="container mx-auto flex h-14 sm:h-16 items-center justify-between px-3 sm:px-4">
+    <div class="flex items-center gap-2 min-w-0 flex-1">
+      <h1 class="text-base sm:text-xl font-semibold truncate">
         {#if user}I will disagree with {user.name ?? user.email ?? "you"}
         {:else}
         Disagree Bot
         {/if}
       </h1>
     </div>
-    <div class="flex items-center gap-4">
+    <div class="flex items-center gap-2 sm:gap-4 shrink-0">
+      {#if user && onClearChat}
+      <Button
+        variant="outline"
+        size="icon"
+        onclick={onClearChat}
+        title="Clear chat"
+      >
+        <Trash2 class="h-4 w-4"/>
+        <span class="sr-only">Clear chat</span>
+      </Button>
+      {/if}
       <Button variant="outline" size="icon" onclick={toggleMode}>
         <Sun class="h-4 w-4 block dark:hidden"/>
         <Moon class="h-4 w-4 hidden dark:block"/>

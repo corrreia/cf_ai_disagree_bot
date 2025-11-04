@@ -50,6 +50,7 @@ let messagesContainer = $state<HTMLDivElement | undefined>(undefined);
 let isLoading = $state(false);
 let ws = $state<WebSocket | null>(null);
 let isConnected = $state(false);
+let isLoadingMessages = $state(false);
 
 function scrollToBottom() {
   setTimeout(() => {
@@ -60,14 +61,85 @@ function scrollToBottom() {
   }, 0);
 }
 
+// Load previous messages when user is available
+async function loadMessages() {
+  if (!browser) {
+    return;
+  }
+  if (!user) {
+    return;
+  }
+  if (isLoadingMessages) {
+    return;
+  }
+
+  try {
+    isLoadingMessages = true;
+    const response = await fetch("/api/chat/memory");
+    if (!response.ok) {
+      return;
+    }
+
+    const responseData = (await response.json()) as {
+      memory?: Array<{
+        id: string;
+        content: string;
+        role: "user" | "assistant";
+        timestamp: number;
+      }>;
+    };
+
+    if (responseData.memory && Array.isArray(responseData.memory)) {
+      messages = responseData.memory.map((msg) => ({
+        id: msg.id,
+        content: msg.content,
+        role: msg.role,
+        timestamp: new Date(msg.timestamp),
+      }));
+      scrollToBottom();
+    }
+  } catch (err) {
+    // biome-ignore lint: console.error is used for debugging
+    console.error("Error loading messages:", err);
+  } finally {
+    isLoadingMessages = false;
+  }
+}
+
+// Clear all messages
+async function clearChat() {
+  if (!browser) {
+    return;
+  }
+  if (!user) {
+    return;
+  }
+
+  try {
+    const response = await fetch("/api/chat/memory", {
+      method: "DELETE",
+    });
+
+    if (response.ok) {
+      messages = [];
+    }
+  } catch (err) {
+    // biome-ignore lint: console.error is used for debugging
+    console.error("Error clearing chat:", err);
+  }
+}
+
 // Connect WebSocket when user is available
 $effect(() => {
   if (browser && user && !ws) {
-    connectWebSocket();
+    loadMessages().then(() => {
+      connectWebSocket();
+    });
   } else if (!user && ws) {
     ws.close();
     ws = null;
     isConnected = false;
+    messages = [];
   }
 });
 
@@ -84,8 +156,6 @@ function connectWebSocket() {
 
     socket.addEventListener("open", () => {
       isConnected = true;
-      // biome-ignore lint: console.log is used for debugging
-      console.log("WebSocket connected");
     });
 
     socket.addEventListener("message", (event) => {
@@ -118,8 +188,6 @@ function connectWebSocket() {
     socket.addEventListener("close", () => {
       isConnected = false;
       ws = null;
-      // biome-ignore lint: console.log is used for debugging
-      console.log("WebSocket disconnected");
       // Attempt to reconnect after a delay if user is still logged in
       if (user) {
         setTimeout(() => {
@@ -188,7 +256,7 @@ function sendMessage() {
 </script>
 
 <div class="flex h-screen flex-col">
-  <Navbar user={user}/>
+  <Navbar user={user} onClearChat={clearChat}/>
 
   {#if !user}
   <WelcomeCard/>

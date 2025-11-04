@@ -140,3 +140,26 @@ use the cloudflare mcp server
 ```
 
 After some console.log debug > paste in to IDE chat, chat with streaming  is working!!
+
+## Prompt 11
+
+```txt
+nice!
+
+add a button to the navbar that clear all the chat (deletes all messages from the chat) and also implement the functionality to actually load previous messages from the memory of the do
+```
+
+again, a shame it does not work on the local dev env :(
+
+## Prompt 12
+
+```txt
+lets make some changes to the ui!
+
+make it more mobile friendly (best prac)
+
+only show the date (and time) upon clicking or hovering a message
+show to the right on assistant messages and to the left on user messages, outside the card
+
+wrap text when a very long word or sequence of characters is sent
+```

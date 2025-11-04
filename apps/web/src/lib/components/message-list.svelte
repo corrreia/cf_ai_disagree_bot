@@ -1,38 +1,35 @@
-<script lang="ts">
-  import MessageBubble from "./message-bubble.svelte";
-  import {
-    Card,
-    CardContent,
-    CardDescription,
-    CardHeader,
-    CardTitle,
-  } from "$lib/components/ui/card";
+<script lang="ts">import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "$lib/components/ui/card";
+import MessageBubble from "./message-bubble.svelte";
 
-  type Message = {
-    id: string;
-    content: string;
-    role: "user" | "assistant";
-    timestamp: Date;
-  };
+type Message = {
+  id: string;
+  content: string;
+  role: "user" | "assistant";
+  timestamp: Date;
+};
 
-  let {
-    messages,
-    messagesContainer = $bindable(undefined),
-  }: {
-    messages: Message[];
-    messagesContainer?: HTMLDivElement | undefined;
-  } = $props();
+let {
+  messages,
+  messagesContainer = $bindable(undefined),
+}: {
+  messages: Message[];
+  messagesContainer?: HTMLDivElement | undefined;
+} = $props();
 </script>
 
 <div
   bind:this={messagesContainer}
-  class="flex-1 overflow-y-auto px-4 py-6 md:px-6 lg:px-8"
+  class="flex-1 overflow-y-auto px-2 py-4 sm:px-4 sm:py-6 md:px-6 lg:px-8"
 >
-  <div class="container mx-auto max-w-4xl space-y-4">
+  <div class="container mx-auto max-w-4xl space-y-3 sm:space-y-4">
     {#if messages.length === 0}
-    <div
-      class="flex h-full min-h-[400px] items-center justify-center py-12"
-    >
+    <div class="flex h-full min-h-[400px] items-center justify-center py-12">
       <Card class="w-full max-w-md shadow-md">
         <CardHeader class="text-center space-y-2 px-6 pt-6 pb-4">
           <CardTitle class="text-2xl font-semibold">
@@ -46,9 +43,8 @@
     </div>
     {:else}
     {#each messages as message (message.id)}
-    <MessageBubble {message} />
+    <MessageBubble {message}/>
     {/each}
     {/if}
   </div>
 </div>
-
