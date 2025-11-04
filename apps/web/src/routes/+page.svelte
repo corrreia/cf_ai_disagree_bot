@@ -182,7 +182,7 @@
         >
           <Card
             class="max-w-[85%] md:max-w-[75%] shadow-sm py-0 {message.role === 'user'
-                ? 'bg-primary/5 dark:bg-primary/10'
+                ? 'bg-muted'
                 : ''}"
           >
             <CardContent class="p-4 md:p-5">
