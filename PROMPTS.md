@@ -83,3 +83,16 @@ workerd/server/server.c++:1952: warning: A DurableObjectNamespace in the config 
 It was clear I needed to set up a monorepo, multi project setup following this [guide](https://developers.cloudflare.com/workers/wrangler/api/#supported-bindings).
 
 So i configured turborepo with a `/apps/web` where the sveltekit app is located, and `apps/agent` where the agent DO is at. Also lined them together in the wrangler configs.
+
+
+----
+
+
+implement a cloudflare agent
+
+currently do a simple thing, just repply with the user's message and keep a state (memory array)>
+
+to communicate between do and woerker use the inetrnalk connection, not http
+
+
+use mcp servers to search cloudflare docs
