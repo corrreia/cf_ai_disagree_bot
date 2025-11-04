@@ -161,17 +161,17 @@ function connectWebSocket() {
     socket.addEventListener("message", (event) => {
       try {
         const wsData = JSON.parse(event.data as string) as WebSocketMessageData;
-        messages = handleWebSocketMessage(
+        messages = handleWebSocketMessage({
           wsData,
           messages,
-          (newMessages) => {
+          setMessages: (newMessages) => {
             messages = newMessages;
           },
-          (loading) => {
+          setIsLoading: (loading) => {
             isLoading = loading;
           },
-          scrollToBottom
-        );
+          scrollToBottom,
+        });
       } catch (error) {
         // biome-ignore lint: console.error is used for debugging
         console.error("Error parsing WebSocket message:", error);
@@ -209,6 +209,10 @@ function connectWebSocket() {
 function sendMessage() {
   const trimmedInput = inputValue.trim();
   if (!trimmedInput) {
+    return;
+  }
+  if (isLoading) {
+    // Prevent sending another message while waiting for response
     return;
   }
   if (!(user && ws) || ws.readyState !== WebSocket.OPEN) {

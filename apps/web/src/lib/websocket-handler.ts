@@ -15,17 +15,18 @@ export type WebSocketMessageData = {
 
 const RECONNECT_DELAY_MS = 3000;
 
-export function handleWebSocketMessage(
-  wsData: WebSocketMessageData,
-  messages: Message[],
-  setMessages: (messages: Message[]) => void,
-  setIsLoading: (loading: boolean) => void,
-  scrollToBottom: () => void
-): Message[] {
+export function handleWebSocketMessage(options: {
+  wsData: WebSocketMessageData;
+  messages: Message[];
+  setMessages: (messages: Message[]) => void;
+  setIsLoading: (loading: boolean) => void;
+  scrollToBottom: () => void;
+}): Message[] {
+  const { wsData, messages, setIsLoading, scrollToBottom } = options;
   const updatedMessages = [...messages];
 
   if (wsData.type === "assistant_message_start" && wsData.messageId) {
-    setIsLoading(false);
+    // Keep isLoading true - don't set to false here, wait for complete message
     const assistantMessage: Message = {
       id: wsData.messageId,
       content: "",
@@ -50,14 +51,15 @@ export function handleWebSocketMessage(
       scrollToBottom();
     }
   } else if (wsData.type === "assistant_message_complete" && wsData.message) {
-    const messageIndex = updatedMessages.findIndex(
-      (m) => m.id === wsData.message.id
-    );
+    // Message is complete, set loading to false
+    setIsLoading(false);
+    const message = wsData.message;
+    const messageIndex = updatedMessages.findIndex((m) => m.id === message.id);
     const assistantMessage: Message = {
-      id: wsData.message.id,
-      content: wsData.message.content,
-      role: wsData.message.role,
-      timestamp: new Date(wsData.message.timestamp),
+      id: message.id,
+      content: message.content,
+      role: message.role,
+      timestamp: new Date(message.timestamp),
     };
     if (messageIndex >= 0) {
       updatedMessages[messageIndex] = assistantMessage;
@@ -81,4 +83,3 @@ export function handleWebSocketMessage(
 }
 
 export { RECONNECT_DELAY_MS };
-
