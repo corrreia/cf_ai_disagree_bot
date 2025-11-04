@@ -57,6 +57,8 @@
   let inputValue = $state("");
   let messagesContainer = $state<HTMLDivElement | undefined>(undefined);
   let isLoading = $state(false);
+  let ws = $state<WebSocket | null>(null);
+  let isConnected = $state(false);
 
   function scrollToBottom() {
     setTimeout(() => {
@@ -67,12 +69,136 @@
     }, 0);
   }
 
-  async function sendMessage() {
+  // Connect WebSocket when user is available
+  $effect(() => {
+    if (browser && user && !ws) {
+      connectWebSocket();
+    } else if (!user && ws) {
+      ws.close();
+      ws = null;
+      isConnected = false;
+    }
+  });
+
+  function connectWebSocket() {
+    if (!user) return;
+
+    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+    const wsUrl = `${protocol}//${window.location.host}/api/chat/ws?userId=${encodeURIComponent(user.id)}`;
+
+    try {
+      const socket = new WebSocket(wsUrl);
+
+      socket.addEventListener("open", () => {
+        isConnected = true;
+        // biome-ignore lint: console.log is used for debugging
+        console.log("WebSocket connected");
+      });
+
+      socket.addEventListener("message", (event) => {
+        try {
+          const data = JSON.parse(event.data) as {
+            type: string;
+            message?: Message & { timestamp: number };
+            messageId?: string;
+            chunk?: string;
+            error?: string;
+          };
+
+          if (data.type === "assistant_message_start" && data.messageId) {
+            // Start of streaming response - create a placeholder message
+            isLoading = false;
+            const assistantMessage: Message = {
+              id: data.messageId,
+              content: "",
+              role: "assistant",
+              timestamp: new Date(),
+            };
+            messages = [...messages, assistantMessage];
+            scrollToBottom();
+          } else if (data.type === "assistant_message_chunk" && data.messageId && data.chunk) {
+            // Streaming chunk - append to existing message
+            const messageIndex = messages.findIndex((m) => m.id === data.messageId);
+            if (messageIndex >= 0) {
+              messages[messageIndex] = {
+                ...messages[messageIndex],
+                content: messages[messageIndex].content + data.chunk,
+              };
+              scrollToBottom();
+            }
+          } else if (data.type === "assistant_message_complete" && data.message) {
+            // Final message - ensure it's complete
+            const messageIndex = messages.findIndex((m) => m.id === data.message.id);
+            if (messageIndex >= 0) {
+              messages[messageIndex] = {
+                id: data.message.id,
+                content: data.message.content,
+                role: data.message.role,
+                timestamp: new Date(data.message.timestamp),
+              };
+            } else {
+              const assistantMessage: Message = {
+                id: data.message.id,
+                content: data.message.content,
+                role: data.message.role,
+                timestamp: new Date(data.message.timestamp),
+              };
+              messages = [...messages, assistantMessage];
+            }
+            scrollToBottom();
+          } else if (data.type === "error") {
+            isLoading = false;
+            const errorMessage: Message = {
+              id: crypto.randomUUID(),
+              content: data.error || "An error occurred",
+              role: "assistant",
+              timestamp: new Date(),
+            };
+            messages = [...messages, errorMessage];
+            scrollToBottom();
+          }
+        } catch (error) {
+          // biome-ignore lint: console.error is used for debugging
+          console.error("Error parsing WebSocket message:", error);
+        }
+      });
+
+      socket.addEventListener("error", (error) => {
+        // biome-ignore lint: console.error is used for debugging
+        console.error("WebSocket error:", error);
+        isConnected = false;
+        isLoading = false;
+      });
+
+      socket.addEventListener("close", () => {
+        isConnected = false;
+        ws = null;
+        // biome-ignore lint: console.log is used for debugging
+        console.log("WebSocket disconnected");
+        // Attempt to reconnect after a delay if user is still logged in
+        if (user) {
+          setTimeout(() => {
+            if (user && !ws) {
+              connectWebSocket();
+            }
+          }, 3000);
+        }
+      });
+
+      ws = socket;
+    } catch (error) {
+      // biome-ignore lint: console.error is used for debugging
+      console.error("Error connecting WebSocket:", error);
+      isConnected = false;
+    }
+  }
+
+  function sendMessage() {
     const trimmedInput = inputValue.trim();
     if (!trimmedInput) {
       return;
     }
-    if (!user) {
+    if (!user || !ws || ws.readyState !== WebSocket.OPEN) {
       return;
     }
 
@@ -89,36 +215,19 @@
     scrollToBottom();
 
     try {
-      const response = await fetch("/api/chat", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
+      // Send message with the same ID so backend can use it
+      ws.send(
+        JSON.stringify({
+          type: "message",
           message: trimmedInput,
+          messageId: userMessage.id,
           userId: user.id,
-        }),
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error((error as { error?: string }).error || "Failed to send message");
-      }
-
-      const responseData = await response.json();
-
-      const assistantMessage: Message = {
-        id: crypto.randomUUID(),
-        content: (responseData as { response: string }).response,
-        role: "assistant",
-        timestamp: new Date(),
-      };
-
-      messages = [...messages, assistantMessage];
-      scrollToBottom();
+        })
+      );
     } catch (error) {
       // biome-ignore lint: console.error is used for debugging
       console.error("Error sending message:", error);
+      isLoading = false;
       const errorMessage: Message = {
         id: crypto.randomUUID(),
         content: error instanceof Error ? error.message : "Failed to send message. Please try again.",
@@ -127,8 +236,6 @@
       };
       messages = [...messages, errorMessage];
       scrollToBottom();
-    } finally {
-      isLoading = false;
     }
   }
 
@@ -210,8 +317,9 @@
         />
         <Button
           onclick={sendMessage}
-          disabled={!user || !inputValue.trim() || isLoading}
+          disabled={!user || !inputValue.trim() || isLoading || !isConnected}
           size="icon"
+          title={!isConnected ? "Connecting..." : ""}
         >
           <Send class="size-4"/>
         </Button>

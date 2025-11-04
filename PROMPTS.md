@@ -96,3 +96,14 @@ use mcp servers to search cloudflare docs
 ```
 
 THis implemented the agent with successful communication between agent (DO) <-> worker. This only works in the `wrangler dev` environment and is a pain to develop in :)
+
+## Prompt 8
+
+```txt
+lets implement the ai agent now! 
+
+we need to bind ai to the durable object (i think) check cloudflare examples and docs
+
+llama-3.3-70b-instruct-fp8-fast lets use this models
+websockets suport!
+```
