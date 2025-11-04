@@ -59,5 +59,27 @@ make this center section prettier, right spacing etc
 
 Just some visual things.
 
-## Prompt 7
+## Manual Changes
 
+`bun add agents` added agents sdk, the plan is to have one agent (DO) for each user, keep chat state memory etc on it.
+
+Added the DO definition to the project `wrangler.jsonc` and very quickly ran in to this problem:
+
+```bash
+▲ [WARNING]                             You have defined bindings to the following internal Durable Objects:
+
+                                - {"name":"ChatAgent","class_name":"ChatAgent"}
+                                These will not work in local development, but they should work in production.
+
+                                If you want to develop these locally, you can define your DO in a separate Worker, with a
+  separate configuration file.
+                                For detailed instructions, refer to the Durable Objects section here:
+  https://developers.cloudflare.com/workers/wrangler/api#supported-bindings
+
+
+workerd/server/server.c++:1952: warning: A DurableObjectNamespace in the config referenced the class "ChatAgent", but no such Durable Object class is exported from the worker. Please make sure the class name matches, it is exported, and the class extends 'DurableObject'. Attempts to call to this Durable Object class will fail at runtime, but historically this was not a startup-time error. Future versions of workerd may make this a startup-time error.
+```
+
+It was clear I needed to set up a monorepo, multi project setup following this [guide](https://developers.cloudflare.com/workers/wrangler/api/#supported-bindings).
+
+So i configured turborepo with a `/apps/web` where the sveltekit app is located, and `apps/agent` where the agent DO is at. Also lined them together in the wrangler configs.
