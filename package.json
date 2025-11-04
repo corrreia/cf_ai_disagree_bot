@@ -9,6 +9,7 @@
   ],
   "scripts": {
     "dev": "turbo run dev",
+    "dev:workers": "turbo run build --filter=@disagree-bot/web && wrangler dev -c apps/web/wrangler.jsonc -c apps/agent/wrangler.jsonc",
     "build": "turbo run build",
     "check": "turbo run check",
     "lint": "biome check .",
