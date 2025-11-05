@@ -1,26 +1,40 @@
-<script lang="ts">
-  import { Send } from "lucide-svelte";
-  import { Button } from "$lib/components/ui/button";
-  import { Input } from "$lib/components/ui/input";
+<script lang="ts">import { Send } from "lucide-svelte";
+import { browser } from "$app/environment";
+import { Button } from "$lib/components/ui/button";
+import { Input } from "$lib/components/ui/input";
 
-  let {
-    inputValue = $bindable(""),
-    isLoading,
-    isConnected,
-    onSend,
-  }: {
-    inputValue?: string;
-    isLoading: boolean;
-    isConnected: boolean;
-    onSend: () => void;
-  } = $props();
+let {
+  inputValue = $bindable(""),
+  isLoading,
+  isConnected,
+  onSend,
+}: {
+  inputValue?: string;
+  isLoading: boolean;
+  isConnected: boolean;
+  onSend: () => void;
+} = $props();
 
-  function handleKeyPress(event: KeyboardEvent) {
-    if (event.key === "Enter" && !event.shiftKey) {
-      event.preventDefault();
-      onSend();
-    }
+let inputRef = $state<HTMLInputElement | null>(null);
+let previousIsLoading = $state(isLoading);
+
+// Focus input when it becomes available after bot finishes writing
+$effect(() => {
+  if (browser && inputRef && previousIsLoading && !isLoading && isConnected) {
+    // Small delay to ensure the input is fully enabled
+    setTimeout(() => {
+      inputRef?.focus();
+    }, 0);
   }
+  previousIsLoading = isLoading;
+});
+
+function handleKeyPress(event: KeyboardEvent) {
+  if (event.key === "Enter" && !event.shiftKey) {
+    event.preventDefault();
+    onSend();
+  }
+}
 </script>
 
 <div
@@ -28,6 +42,7 @@
 >
   <div class="container mx-auto max-w-4xl flex gap-2 sm:gap-3">
     <Input
+      bind:ref={inputRef}
       bind:value={inputValue}
       onkeydown={handleKeyPress}
       placeholder="Type your message..."
@@ -46,4 +61,3 @@
     </Button>
   </div>
 </div>
-

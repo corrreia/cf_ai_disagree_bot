@@ -212,3 +212,9 @@ export async function getChatAgent(
 ```
 
 We needed to add this on the ``/server/agents/types.ts` to dynamically load agents package because it is not compatible at compile time (chat GPT helped a bit on this one).
+
+## Prompt 15
+
+```txt
+make the message box not lose focus even after becoming unavailable while the bot is writing a message
+```
