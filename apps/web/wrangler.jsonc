@@ -22,7 +22,7 @@
   ],
   "vars": {
     "GOOGLE_CLIENT_ID": "961761355875-kgqgi5ct7sjudf76ei11avec581gdggk.apps.googleusercontent.com",
-    "APP_URL": "http://localhost:8787"
+    "APP_URL": "https://disagree.tomascorreia.net"
   },
   "durable_objects": {
     "bindings": [

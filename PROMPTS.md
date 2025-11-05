@@ -176,7 +176,7 @@ do not let the user send another message before the last one is fully received
 
 Found out we can actually have rpc calls between 2 workers in the dev env (honestly, it would not make any sense if we did't), added the script "dev:workers" to package.jons
 
-Also created a ``/server/agents/types` so we have type safe calls to the agent
+Also created a `/server/agents/types` so we have type safe calls to the agent
 
 ## Prompt 14
 
@@ -211,7 +211,7 @@ export async function getChatAgent(
 }
 ```
 
-We needed to add this on the ``/server/agents/types.ts` to dynamically load agents package because it is not compatible at compile time (chat GPT helped a bit on this one).
+We needed to add this on the `/server/agents/types.ts` to dynamically load agents package because it is not compatible at compile time (chat GPT helped a bit on this one).
 
 ## Prompt 15
 
