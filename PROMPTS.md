@@ -218,3 +218,13 @@ We needed to add this on the `/server/agents/types.ts` to dynamically load agent
 ```txt
 make the message box not lose focus even after becoming unavailable while the bot is writing a message
 ```
+
+## Prompt 16
+
+```txt
+on mobile the ui is a bit strange
+
+i want the ui to "compact" when the keyboard opens, does that make sense?
+
+See how to do it online pls
+```

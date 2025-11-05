@@ -259,15 +259,17 @@ function sendMessage() {
 }
 </script>
 
-<div class="flex h-screen flex-col">
+<div class="flex h-[100dvh] flex-col overflow-hidden">
   <Navbar user={user} onClearChat={clearChat}/>
 
   {#if !user}
   <WelcomeCard/>
   {:else}
-  <div class="flex flex-1 flex-col overflow-hidden">
+  <div class="flex flex-1 flex-col overflow-hidden min-h-0">
     <MessageList {messages} bind:messagesContainer/>
-    <ChatInput bind:inputValue {isLoading} {isConnected} onSend={sendMessage}/>
+    <div class="shrink-0 pb-safe">
+      <ChatInput bind:inputValue {isLoading} {isConnected} onSend={sendMessage}/>
+    </div>
   </div>
   {/if}
 </div>

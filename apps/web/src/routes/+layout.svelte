@@ -10,4 +10,4 @@ let { children } = $props();
 </svelte:head>
 
 <ModeWatcher/>
-<div class="min-h-screen">{@render children?.()}</div>
+<div class="h-[100dvh] overflow-hidden">{@render children?.()}</div>
