@@ -1,7 +1,7 @@
 import type { RequestEvent } from "@sveltejs/kit";
 import { json } from "@sveltejs/kit";
 import { getRequestEvent } from "$app/server";
-import type { ChatAgentStub } from "$lib/server/agents/types";
+import { getChatAgent } from "$lib/server/agents/types";
 import { auth } from "$lib/server/auth";
 
 export const GET = async ({ request }: RequestEvent) => {
@@ -31,11 +31,11 @@ export const GET = async ({ request }: RequestEvent) => {
       return json({ error: "ChatAgent binding not found" }, { status: 500 });
     }
 
-    // Get the agent instance for this user
-    const agentStub = chatAgentNamespace.getByName(userId) as ChatAgentStub;
+    // Get agent instance using SDK's getAgentByName helper
+    const agent = await getChatAgent(chatAgentNamespace, userId);
 
-    // Call the getMemory RPC method on the agent
-    const memory = await agentStub.getMemory();
+    // Call methods directly - types are properly inferred from ChatAgentStub
+    const memory = await agent.getMemory();
 
     return json({ memory });
   } catch (error) {
@@ -78,11 +78,11 @@ export const DELETE = async ({ request }: RequestEvent) => {
       return json({ error: "ChatAgent binding not found" }, { status: 500 });
     }
 
-    // Get the agent instance for this user
-    const agentStub = chatAgentNamespace.getByName(userId) as ChatAgentStub;
+    // Get agent instance using SDK's getAgentByName helper
+    const agent = await getChatAgent(chatAgentNamespace, userId);
 
-    // Call the clearMemory RPC method on the agent
-    await agentStub.clearMemory();
+    // Call methods directly - types are properly inferred from ChatAgentStub
+    await agent.clearMemory();
 
     return json({ success: true });
   } catch (error) {

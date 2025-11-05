@@ -1,13 +1,5 @@
 /// <reference path="./worker-configuration.d.ts" />
-import { Agent } from "agents";
-import { asc } from "drizzle-orm";
-import {
-  type DrizzleSqliteDODatabase,
-  drizzle,
-} from "drizzle-orm/durable-sqlite";
-import { migrate } from "drizzle-orm/durable-sqlite/migrator";
-import migrations from "../drizzle/migrations.js";
-import { messagesTable } from "./db/schema";
+import { Agent, type Connection, type ConnectionContext } from "agents";
 
 const SSE_DATA_PREFIX_LENGTH = 6; // Length of "data: "
 
@@ -27,103 +19,32 @@ type AgentState = {
 type Env = Cloudflare.Env;
 
 export class ChatAgent extends Agent<Env, AgentState> {
-  storage: DurableObjectStorage;
-  db: DrizzleSqliteDODatabase<{ messages: typeof messagesTable }>;
-
-  // Required by Agent base class - provides initial state shape before onStart() loads from DB
-  // This value is immediately replaced in onStart() with data from SQLite database
+  // Initial state - SDK automatically persists and loads this
   initialState: AgentState = {
     memory: [],
   };
 
-  constructor(ctx: DurableObjectState, env: Env) {
-    super(ctx, env);
-    this.storage = ctx.storage;
-    this.db = drizzle(this.storage, { logger: false });
-
-    // Make sure all migrations complete before accepting queries.
-    // Otherwise you will need to run `this._migrate()` in any function
-    // that accesses the Drizzle database `this.db`.
-    // biome-ignore lint/suspicious/useAwait: migrate is synchronous
-    ctx.blockConcurrencyWhile(async () => {
-      this._migrate();
-    });
-  }
-
   async onStart() {
-    // Agent started - memory is available via this.state.memory
-    // Load messages from database
-    await this.loadMessagesFromDb();
+    // Agent started - state is automatically loaded by SDK
+    // No database setup needed, setState() handles persistence automatically
   }
 
-  private _migrate(): void {
-    migrate(this.db, migrations);
+  // Handle WebSocket connections - SDK automatically handles the upgrade
+  // Called when a client establishes a WebSocket connection
+  async onConnect(
+    _connection: Connection,
+    _ctx: ConnectionContext
+  ): Promise<void> {
+    // Connections are automatically accepted by the SDK
+    // Access the original request via ctx.request for auth, headers, etc.
+    // You can explicitly close a connection here with connection.close() if needed
   }
 
-  // Load messages from database and update state
-  private async loadMessagesFromDb(): Promise<void> {
-    try {
-      const messages = await this.db
-        .select()
-        .from(messagesTable)
-        .orderBy(asc(messagesTable.timestamp));
-      (this.state as AgentState).memory = messages.map((msg) => ({
-        id: msg.id,
-        content: msg.content,
-        role: msg.role as "user" | "assistant",
-        timestamp: msg.timestamp,
-      }));
-    } catch (error) {
-      // biome-ignore lint: console.error is used for debugging
-      console.error("Error loading messages from database:", error);
-      (this.state as AgentState).memory = [];
-    }
-  }
-
-  // Save a message to the database
-  private async saveMessageToDb(message: Message): Promise<void> {
-    try {
-      await this.db.insert(messagesTable).values({
-        id: message.id,
-        content: message.content,
-        role: message.role,
-        timestamp: message.timestamp,
-      });
-    } catch (error) {
-      // biome-ignore lint: console.error is used for debugging
-      console.error("Error saving message to database:", error, message);
-      throw error; // Re-throw to let caller handle it
-    }
-  }
-
-  // Handle WebSocket connections using Native Durable Object WebSocket API for hibernation
-  // biome-ignore lint/suspicious/useAwait: this is a DO method
-  async fetch(request: Request): Promise<Response> {
-    // Handle WebSocket upgrade
-    if (request.headers.get("Upgrade") === "websocket") {
-      // biome-ignore lint/correctness/noUndeclaredVariables: WebSocketPair is a global provided by Cloudflare Workers runtime
-      const pair = new WebSocketPair();
-      const client = pair[0];
-      const server = pair[1];
-
-      // Accept the server WebSocket connection using the hibernation API
-      // This allows the Durable Object to hibernate without disconnecting clients
-      this.ctx.acceptWebSocket(server);
-
-      return new Response(null, {
-        status: 101,
-        webSocket: client,
-      } as ResponseInit);
-    }
-
-    return new Response("Expected WebSocket upgrade", { status: 426 });
-  }
-
-  // Handle WebSocket messages using the hibernation API
-  // This method is called automatically when a message is received during hibernation
-  async webSocketMessage(
-    ws: WebSocket,
-    message: string | ArrayBuffer
+  // Handle WebSocket messages - SDK automatically routes messages here
+  // Called for each incoming WebSocket message
+  async onMessage(
+    connection: Connection,
+    message: string | ArrayBuffer | ArrayBufferView
   ): Promise<void> {
     try {
       const messageStr =
@@ -137,12 +58,16 @@ export class ChatAgent extends Agent<Env, AgentState> {
       };
 
       if (data.type === "message" && data.message) {
-        await this.handleWebSocketMessage(ws, data.message, data.messageId);
+        await this.handleWebSocketMessage(
+          connection,
+          data.message,
+          data.messageId
+        );
       }
     } catch (error) {
       // biome-ignore lint: console.error is used for debugging
       console.error("Error handling WebSocket message:", error);
-      ws.send(
+      connection.send(
         JSON.stringify({
           type: "error",
           error: error instanceof Error ? error.message : "Unknown error",
@@ -151,9 +76,29 @@ export class ChatAgent extends Agent<Env, AgentState> {
     }
   }
 
-  // Handle WebSocket close using the hibernation API
-  async webSocketClose(
-    _ws: WebSocket,
+  // Handle WebSocket errors
+  // Note: SDK may call this with just error or with connection+error
+  onError(connectionOrError: Connection | unknown, error?: unknown): void {
+    if (
+      error !== undefined &&
+      typeof connectionOrError === "object" &&
+      connectionOrError !== null &&
+      "id" in connectionOrError
+    ) {
+      // Called with (connection, error)
+      const connection = connectionOrError as Connection;
+      // biome-ignore lint: console.error is used for debugging
+      console.error(`WebSocket connection error (${connection.id}):`, error);
+    } else {
+      // Called with just (error)
+      // biome-ignore lint: console.error is used for debugging
+      console.error("WebSocket error:", connectionOrError);
+    }
+  }
+
+  // Handle WebSocket close events
+  async onClose(
+    _connection: Connection,
     _code: number,
     _reason: string,
     _wasClean: boolean
@@ -208,9 +153,13 @@ export class ChatAgent extends Agent<Env, AgentState> {
     return "";
   }
 
-  // Send a streaming chunk via WebSocket
-  private sendChunk(ws: WebSocket, messageId: string, chunk: string): void {
-    ws.send(
+  // Send a streaming chunk via WebSocket connection
+  private sendChunk(
+    connection: Connection,
+    messageId: string,
+    chunk: string
+  ): void {
+    connection.send(
       JSON.stringify({
         type: "assistant_message_chunk",
         messageId,
@@ -260,7 +209,7 @@ export class ChatAgent extends Agent<Env, AgentState> {
   // Process lines from the stream buffer
   private processStreamLines(
     lines: string[],
-    ws: WebSocket,
+    connection: Connection,
     messageId: string,
     currentResponse: string
   ): string {
@@ -274,17 +223,17 @@ export class ChatAgent extends Agent<Env, AgentState> {
       const textChunk = this.processStreamLine(line);
       if (textChunk) {
         fullResponse += textChunk;
-        this.sendChunk(ws, messageId, textChunk);
+        this.sendChunk(connection, messageId, textChunk);
       }
       // Skip logging for expected empty lines (metadata, empty responses, [DONE], etc.)
     }
     return fullResponse;
   }
 
-  // Process the AI streaming response and send chunks via WebSocket
+  // Process the AI streaming response and send chunks via WebSocket connection
   private async processAIStream(
     stream: ReadableStream,
-    ws: WebSocket,
+    connection: Connection,
     messageId: string
   ): Promise<string> {
     const reader = stream.getReader();
@@ -309,7 +258,7 @@ export class ChatAgent extends Agent<Env, AgentState> {
 
         fullResponse = this.processStreamLines(
           lines,
-          ws,
+          connection,
           messageId,
           fullResponse
         );
@@ -320,7 +269,7 @@ export class ChatAgent extends Agent<Env, AgentState> {
         const textChunk = this.processStreamLine(buffer);
         if (textChunk) {
           fullResponse += textChunk;
-          this.sendChunk(ws, messageId, textChunk);
+          this.sendChunk(connection, messageId, textChunk);
         }
       }
     } finally {
@@ -332,7 +281,7 @@ export class ChatAgent extends Agent<Env, AgentState> {
 
   // Handle WebSocket message and send AI response
   private async handleWebSocketMessage(
-    ws: WebSocket,
+    connection: Connection,
     userMessage: string,
     messageId?: string
   ): Promise<void> {
@@ -344,11 +293,9 @@ export class ChatAgent extends Agent<Env, AgentState> {
       timestamp: Date.now(),
     };
 
-    // Save to database
-    await this.saveMessageToDb(userMsg);
-    const updatedMemory = [...this.state.memory, userMsg];
-    // Update local state reference
-    (this.state as AgentState).memory = updatedMemory;
+    // setState automatically persists to database and syncs to clients
+    this.setState({ memory: [...this.state.memory, userMsg] });
+    const updatedMemory = this.state.memory;
 
     // Prepare messages for AI (convert to chat format)
     // Get system instructions from environment variable
@@ -373,7 +320,7 @@ export class ChatAgent extends Agent<Env, AgentState> {
       const assistantMessageId = crypto.randomUUID();
 
       // Send start of streaming indicator
-      ws.send(
+      connection.send(
         JSON.stringify({
           type: "assistant_message_start",
           messageId: assistantMessageId,
@@ -392,7 +339,7 @@ export class ChatAgent extends Agent<Env, AgentState> {
       // Process stream and collect full response
       const fullResponse = await this.processAIStream(
         stream,
-        ws,
+        connection,
         assistantMessageId
       );
 
@@ -404,14 +351,11 @@ export class ChatAgent extends Agent<Env, AgentState> {
         timestamp: Date.now(),
       };
 
-      // Add assistant response to memory
-      await this.saveMessageToDb(assistantMessage);
-      const finalMemory = [...updatedMemory, assistantMessage];
-      // Update local state reference
-      (this.state as AgentState).memory = finalMemory;
+      // setState automatically persists to database and syncs to clients
+      this.setState({ memory: [...updatedMemory, assistantMessage] });
 
       // Send completion message
-      ws.send(
+      connection.send(
         JSON.stringify({
           type: "assistant_message_complete",
           message: assistantMessage,
@@ -420,7 +364,7 @@ export class ChatAgent extends Agent<Env, AgentState> {
     } catch (error) {
       // biome-ignore lint: console.error is used for debugging
       console.error("Error calling AI:", error);
-      ws.send(
+      connection.send(
         JSON.stringify({
           type: "error",
           error:
@@ -445,10 +389,9 @@ export class ChatAgent extends Agent<Env, AgentState> {
       timestamp: Date.now(),
     };
 
-    // Save to database
-    await this.saveMessageToDb(userMsg);
-    const updatedMemory = [...this.state.memory, userMsg];
-    (this.state as AgentState).memory = updatedMemory;
+    // setState automatically persists to database and syncs to clients
+    this.setState({ memory: [...this.state.memory, userMsg] });
+    const updatedMemory = this.state.memory;
 
     // Prepare messages for AI (convert to chat format)
     // Get system instructions from environment variable
@@ -485,10 +428,9 @@ export class ChatAgent extends Agent<Env, AgentState> {
         timestamp: Date.now(),
       };
 
-      // Add assistant response to memory
-      await this.saveMessageToDb(assistantMessage);
-      const finalMemory = [...updatedMemory, assistantMessage];
-      (this.state as AgentState).memory = finalMemory;
+      // setState automatically persists to database and syncs to clients
+      this.setState({ memory: [...updatedMemory, assistantMessage] });
+      const finalMemory = this.state.memory;
 
       return {
         response: assistantMessage.content,
@@ -504,38 +446,22 @@ export class ChatAgent extends Agent<Env, AgentState> {
   }
 
   // Method to get conversation history
-  // Loads directly from database to ensure we always have the latest data
-  async getMemory(): Promise<Message[]> {
-    try {
-      const messages = await this.db
-        .select()
-        .from(messagesTable)
-        .orderBy(asc(messagesTable.timestamp));
-      const memory = messages.map((msg) => ({
-        id: msg.id,
-        content: msg.content,
-        role: msg.role as "user" | "assistant",
-        timestamp: msg.timestamp,
-      }));
-      // Update state to keep it in sync
-      (this.state as AgentState).memory = memory;
-      return memory;
-    } catch (error) {
-      // biome-ignore lint: console.error is used for debugging
-      console.error(
-        "Error loading messages from database in getMemory:",
-        error
-      );
-      // Return current state as fallback
-      return this.state.memory;
-    }
+  // State is automatically persisted, just return it
+  getMemory(): Message[] {
+    return this.state.memory;
   }
 
   // Method to clear memory
-  async clearMemory(): Promise<void> {
-    // Delete all messages from database
-    await this.db.delete(messagesTable);
-    (this.state as AgentState).memory = [];
+  clearMemory(): void {
+    // setState automatically persists to database and syncs to clients
+    this.setState({ memory: [] });
+  }
+
+  // Called when the Agent's state is updated from any source
+  // source can be "server" or a client Connection
+  onStateUpdate(_state: AgentState, _source: "server" | Connection): void {
+    // React to state changes - useful for logging, metrics, or validation
+    // This is called automatically whenever setState() is called
   }
 }
 

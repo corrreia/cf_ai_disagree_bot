@@ -192,3 +192,23 @@ This added drizzle with durable objects sql, this makes managing, queering and m
 
 The AI also detected a problem retrieving the messages from tb on start (example a F5 on the webpage).
 
+## Manual changes
+
+I have noticed that im not taking advantage of the `agents` package, at all. Despite drizzle with DO's incredible integration, we were just over complicating too much this simple agent. se we reverted to using the agent `Connection` type and the `setState()` etc. This overall reduced the code by around 200 lines.
+
+```typescript
+export async function getChatAgent(
+  namespace: DurableObjectNamespace,
+  userId: string
+): Promise<ChatAgentStub> {
+  // Dynamic import loads at runtime in Cloudflare Workers environment
+  const { getAgentByName } = await import("agents");
+  const agent = await getAgentByName(
+    namespace as unknown as AgentNamespace<Agent>,
+    userId
+  );
+  return agent as unknown as ChatAgentStub;
+}
+```
+
+We needed to add this on the ``/server/agents/types.ts` to dynamically load agents package because it is not compatible at compile time (chat GPT helped a bit on this one).

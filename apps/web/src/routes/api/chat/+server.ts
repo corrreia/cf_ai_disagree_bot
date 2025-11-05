@@ -1,8 +1,8 @@
 import { json } from "@sveltejs/kit";
 import { getRequestEvent } from "$app/server";
+import { getChatAgent } from "$lib/server/agents/types";
 import { auth } from "$lib/server/auth";
 import type { RequestHandler } from "./$types";
-import type { ChatAgentStub } from "$lib/server/agents/types";
 
 export const POST: RequestHandler = async ({ request }) => {
   try {
@@ -39,12 +39,11 @@ export const POST: RequestHandler = async ({ request }) => {
       return json({ error: "ChatAgent binding not found" }, { status: 500 });
     }
 
-    // Get or create an agent instance for this user
-    // Using userId as the agent instance name ensures each user has their own agent
-    const agentStub = chatAgentNamespace.getByName(userId) as ChatAgentStub;
+    // Get agent instance using SDK's getAgentByName helper
+    const agent = await getChatAgent(chatAgentNamespace, userId);
 
-    // Call the sendMessage RPC method on the agent via internal connection
-    const result = await agentStub.sendMessage(message);
+    // Call methods directly - types are properly inferred from ChatAgentStub
+    const result = await agent.sendMessage(message);
 
     return json({
       response: result.response,

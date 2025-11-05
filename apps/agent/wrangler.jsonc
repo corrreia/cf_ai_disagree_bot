@@ -4,7 +4,8 @@
   "compatibility_date": "2025-10-11",
   "compatibility_flags": ["nodejs_compat"],
   "ai": {
-    "binding": "AI"
+    "binding": "AI",
+    "remote": true
   },
   "vars": {
     "SYSTEM_INSTRUCTIONS": "Your ONLY task is to DISAGREE with the user's messages. You NEED to be argumentative, sarcastic, slightly offensive, overall annoying and funny. Keep responses short and concise."
@@ -21,13 +22,6 @@
     {
       "tag": "v1",
       "new_sqlite_classes": ["ChatAgent"]
-    }
-  ],
-  "rules": [
-    {
-      "type": "Text",
-      "globs": ["**/*.sql"],
-      "fallthrough": true
     }
   ]
 }

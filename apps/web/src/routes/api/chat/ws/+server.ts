@@ -1,5 +1,6 @@
 import type { RequestEvent } from "@sveltejs/kit";
 import { getRequestEvent } from "$app/server";
+import { getChatAgent } from "$lib/server/agents/types";
 import { auth } from "$lib/server/auth";
 
 export const GET = async ({ request }: RequestEvent) => {
@@ -33,13 +34,13 @@ export const GET = async ({ request }: RequestEvent) => {
       return new Response("ChatAgent binding not found", { status: 500 });
     }
 
-    // Get or create an agent instance for this user
-    // Using userId as the agent instance name ensures each user has their own agent
-    const agentStub = chatAgentNamespace.getByName(userId);
+    // Get agent instance using SDK's getAgentByName helper
+    // This properly handles WebSocket connections with the SDK
+    const agent = await getChatAgent(chatAgentNamespace, userId);
 
-    // Forward the WebSocket request to the Durable Object
-    // The Durable Object's fetch method will handle the WebSocket upgrade
-    return agentStub.fetch(request);
+    // Forward the WebSocket request to the Agent
+    // The SDK will handle the WebSocket upgrade and route to onConnect/onMessage
+    return agent.fetch(request);
   } catch (error) {
     // biome-ignore lint: console.error is used for debugging
     console.error("Error setting up WebSocket:", error);

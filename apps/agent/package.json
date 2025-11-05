@@ -6,15 +6,12 @@
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
-    "cf-typegen": "wrangler types ./src/worker-configuration.d.ts",
-    "db:generate": "drizzle-kit generate"
+    "cf-typegen": "wrangler types ./src/worker-configuration.d.ts"
   },
   "dependencies": {
-    "agents": "^0.2.20",
-    "drizzle-orm": "^0.44.7"
+    "agents": "^0.2.21"
   },
   "devDependencies": {
-    "drizzle-kit": "^0.31.6",
-    "wrangler": "^4.45.3"
+    "wrangler": "^4.45.4"
   }
 }
