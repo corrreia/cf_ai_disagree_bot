@@ -3,6 +3,8 @@
 An AI-powered chatbot that disagrees with everything you say. Built on top of the Cloudflare Ecosystem.
 This project is my submission for the 2026 Intern Program.
 
+Publicly avaliable [here](https://disagree.tomascorreia.net/).
+
 ## How It Works:
 
 - **Frontend**: SvelteKit application with svelte-shadcn components running on Workers.
