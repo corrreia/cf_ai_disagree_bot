@@ -1,6 +1,7 @@
 import type { RequestEvent } from "@sveltejs/kit";
 import { json } from "@sveltejs/kit";
 import { getRequestEvent } from "$app/server";
+import type { ChatAgentStub } from "$lib/server/agents/types";
 import { auth } from "$lib/server/auth";
 
 export const GET = async ({ request }: RequestEvent) => {
@@ -31,21 +32,10 @@ export const GET = async ({ request }: RequestEvent) => {
     }
 
     // Get the agent instance for this user
-    const agentStub = chatAgentNamespace.getByName(userId);
+    const agentStub = chatAgentNamespace.getByName(userId) as ChatAgentStub;
 
     // Call the getMemory RPC method on the agent
-    const memory = await (
-      agentStub as unknown as {
-        getMemory: () => Promise<
-          Array<{
-            id: string;
-            content: string;
-            role: "user" | "assistant";
-            timestamp: number;
-          }>
-        >;
-      }
-    ).getMemory();
+    const memory = await agentStub.getMemory();
 
     return json({ memory });
   } catch (error) {
@@ -89,14 +79,10 @@ export const DELETE = async ({ request }: RequestEvent) => {
     }
 
     // Get the agent instance for this user
-    const agentStub = chatAgentNamespace.getByName(userId);
+    const agentStub = chatAgentNamespace.getByName(userId) as ChatAgentStub;
 
     // Call the clearMemory RPC method on the agent
-    await (
-      agentStub as unknown as {
-        clearMemory: () => Promise<void>;
-      }
-    ).clearMemory();
+    await agentStub.clearMemory();
 
     return json({ success: true });
   } catch (error) {

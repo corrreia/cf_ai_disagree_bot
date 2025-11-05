@@ -1,5 +1,13 @@
 /// <reference path="./worker-configuration.d.ts" />
 import { Agent } from "agents";
+import { asc } from "drizzle-orm";
+import {
+  type DrizzleSqliteDODatabase,
+  drizzle,
+} from "drizzle-orm/durable-sqlite";
+import { migrate } from "drizzle-orm/durable-sqlite/migrator";
+import migrations from "../drizzle/migrations.js";
+import { messagesTable } from "./db/schema";
 
 const SSE_DATA_PREFIX_LENGTH = 6; // Length of "data: "
 
@@ -19,16 +27,72 @@ type AgentState = {
 type Env = Cloudflare.Env;
 
 export class ChatAgent extends Agent<Env, AgentState> {
+  storage: DurableObjectStorage;
+  db: DrizzleSqliteDODatabase<{ messages: typeof messagesTable }>;
+
+  // Required by Agent base class - provides initial state shape before onStart() loads from DB
+  // This value is immediately replaced in onStart() with data from SQLite database
   initialState: AgentState = {
     memory: [],
   };
 
+  constructor(ctx: DurableObjectState, env: Env) {
+    super(ctx, env);
+    this.storage = ctx.storage;
+    this.db = drizzle(this.storage, { logger: false });
+
+    // Make sure all migrations complete before accepting queries.
+    // Otherwise you will need to run `this._migrate()` in any function
+    // that accesses the Drizzle database `this.db`.
+    // biome-ignore lint/suspicious/useAwait: migrate is synchronous
+    ctx.blockConcurrencyWhile(async () => {
+      this._migrate();
+    });
+  }
+
   async onStart() {
     // Agent started - memory is available via this.state.memory
-    // Load state from storage if it exists (for hibernation compatibility)
-    const storedState = await this.ctx.storage.get<AgentState>("state");
-    if (storedState) {
-      (this.state as AgentState).memory = storedState.memory || [];
+    // Load messages from database
+    await this.loadMessagesFromDb();
+  }
+
+  private _migrate(): void {
+    migrate(this.db, migrations);
+  }
+
+  // Load messages from database and update state
+  private async loadMessagesFromDb(): Promise<void> {
+    try {
+      const messages = await this.db
+        .select()
+        .from(messagesTable)
+        .orderBy(asc(messagesTable.timestamp));
+      (this.state as AgentState).memory = messages.map((msg) => ({
+        id: msg.id,
+        content: msg.content,
+        role: msg.role as "user" | "assistant",
+        timestamp: msg.timestamp,
+      }));
+    } catch (error) {
+      // biome-ignore lint: console.error is used for debugging
+      console.error("Error loading messages from database:", error);
+      (this.state as AgentState).memory = [];
+    }
+  }
+
+  // Save a message to the database
+  private async saveMessageToDb(message: Message): Promise<void> {
+    try {
+      await this.db.insert(messagesTable).values({
+        id: message.id,
+        content: message.content,
+        role: message.role,
+        timestamp: message.timestamp,
+      });
+    } catch (error) {
+      // biome-ignore lint: console.error is used for debugging
+      console.error("Error saving message to database:", error, message);
+      throw error; // Re-throw to let caller handle it
     }
   }
 
@@ -280,10 +344,9 @@ export class ChatAgent extends Agent<Env, AgentState> {
       timestamp: Date.now(),
     };
 
+    // Save to database
+    await this.saveMessageToDb(userMsg);
     const updatedMemory = [...this.state.memory, userMsg];
-    // Update state directly via storage to avoid Agent's WebSocket broadcast
-    // which expects Partyserver-managed WebSockets
-    await this.ctx.storage.put("state", { memory: updatedMemory });
     // Update local state reference
     (this.state as AgentState).memory = updatedMemory;
 
@@ -342,9 +405,8 @@ export class ChatAgent extends Agent<Env, AgentState> {
       };
 
       // Add assistant response to memory
+      await this.saveMessageToDb(assistantMessage);
       const finalMemory = [...updatedMemory, assistantMessage];
-      // Update state directly via storage to avoid Agent's WebSocket broadcast
-      await this.ctx.storage.put("state", { memory: finalMemory });
       // Update local state reference
       (this.state as AgentState).memory = finalMemory;
 
@@ -383,10 +445,9 @@ export class ChatAgent extends Agent<Env, AgentState> {
       timestamp: Date.now(),
     };
 
-    // Update state with new message
+    // Save to database
+    await this.saveMessageToDb(userMsg);
     const updatedMemory = [...this.state.memory, userMsg];
-    // Update state directly via storage to avoid Agent's WebSocket broadcast
-    await this.ctx.storage.put("state", { memory: updatedMemory });
     (this.state as AgentState).memory = updatedMemory;
 
     // Prepare messages for AI (convert to chat format)
@@ -425,9 +486,8 @@ export class ChatAgent extends Agent<Env, AgentState> {
       };
 
       // Add assistant response to memory
+      await this.saveMessageToDb(assistantMessage);
       const finalMemory = [...updatedMemory, assistantMessage];
-      // Update state directly via storage to avoid Agent's WebSocket broadcast
-      await this.ctx.storage.put("state", { memory: finalMemory });
       (this.state as AgentState).memory = finalMemory;
 
       return {
@@ -444,14 +504,37 @@ export class ChatAgent extends Agent<Env, AgentState> {
   }
 
   // Method to get conversation history
-  getMemory(): Promise<Message[]> {
-    return Promise.resolve(this.state.memory);
+  // Loads directly from database to ensure we always have the latest data
+  async getMemory(): Promise<Message[]> {
+    try {
+      const messages = await this.db
+        .select()
+        .from(messagesTable)
+        .orderBy(asc(messagesTable.timestamp));
+      const memory = messages.map((msg) => ({
+        id: msg.id,
+        content: msg.content,
+        role: msg.role as "user" | "assistant",
+        timestamp: msg.timestamp,
+      }));
+      // Update state to keep it in sync
+      (this.state as AgentState).memory = memory;
+      return memory;
+    } catch (error) {
+      // biome-ignore lint: console.error is used for debugging
+      console.error(
+        "Error loading messages from database in getMemory:",
+        error
+      );
+      // Return current state as fallback
+      return this.state.memory;
+    }
   }
 
   // Method to clear memory
   async clearMemory(): Promise<void> {
-    // Update state directly via storage to avoid Agent's WebSocket broadcast
-    await this.ctx.storage.put("state", { memory: [] });
+    // Delete all messages from database
+    await this.db.delete(messagesTable);
     (this.state as AgentState).memory = [];
   }
 }

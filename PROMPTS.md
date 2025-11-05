@@ -175,3 +175,20 @@ do not let the user send another message before the last one is fully received
 ## Manual changes
 
 Found out we can actually have rpc calls between 2 workers in the dev env (honestly, it would not make any sense if we did't), added the script "dev:workers" to package.jons
+
+Also created a ``/server/agents/types` so we have type safe calls to the agent
+
+## Prompt 14
+
+```txt
+https://orm.drizzle.team/docs/connect-cloudflare-do 
+
+@index.ts 
+
+lets make the state on the durable object be using sqlite with drizzle
+```
+
+This added drizzle with durable objects sql, this makes managing, queering and migrating the database much simpler.
+
+The AI also detected a problem retrieving the messages from tb on start (example a F5 on the webpage).
+

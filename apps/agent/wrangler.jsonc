@@ -1,7 +1,7 @@
 {
   "name": "disagree-bot-agent",
   "main": "src/index.ts",
-  "compatibility_date": "2025-11-01",
+  "compatibility_date": "2025-10-11",
   "compatibility_flags": ["nodejs_compat"],
   "ai": {
     "binding": "AI"
@@ -21,6 +21,13 @@
     {
       "tag": "v1",
       "new_sqlite_classes": ["ChatAgent"]
+    }
+  ],
+  "rules": [
+    {
+      "type": "Text",
+      "globs": ["**/*.sql"],
+      "fallthrough": true
     }
   ]
 }
