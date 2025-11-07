@@ -11,7 +11,7 @@ function getEnv() {
   if (!event?.platform?.env) {
     throw new Error("Environment not available. Platform not found.");
   }
-  return event.platform.env as typeof event.platform.env
+  return event.platform.env as typeof event.platform.env;
 }
 
 let authInstance: ReturnType<typeof betterAuth> | undefined;
@@ -36,6 +36,7 @@ export function getAuth() {
         },
       },
       baseURL: env.APP_URL,
+      secret: env.BETTER_AUTH_SECRET,
       basePath: "/api/auth",
       plugins: [sveltekitCookies(getRequestEvent)], // make sure this is the last plugin in the array
     });
