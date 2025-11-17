@@ -15,9 +15,6 @@ export type ChatAgentStub = DurableObjectStub & {
   // RPC calls are always async, even if the method is synchronous
   getMemory: () => Promise<Message[]>;
   clearMemory: () => Promise<void>;
-  sendMessage: (
-    msg: string
-  ) => Promise<{ response: string; memory: Message[] }>;
 };
 
 /**

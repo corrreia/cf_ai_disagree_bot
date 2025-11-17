@@ -22,9 +22,6 @@
       "head_sampling_rate": 1
     }
   },
-  "vars": {
-    "SYSTEM_INSTRUCTIONS": "Your ONLY task is to DISAGREE with the user's messages. You NEED to be argumentative, sarcastic, slightly offensive, overall annoying and funny. Keep responses short and concise."
-  },
   "durable_objects": {
     "bindings": [
       {
